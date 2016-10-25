@@ -33,14 +33,18 @@ int main(int argc, char *argv[])
 	trylist_t *game_data;
 	FILE *f;
 
-	if (argc != 2) {
+	if (argc > 2) {
 		fprintf(stderr, "Usage: %s [sudoku_file]\n", argv[0]);
 		exit(-1);
 	}
 
-	if ((f = fopen(argv[1], "rb")) == NULL) {
-		fprintf(stderr, "Error opening file: %s\n", argv[1]);
-		exit(-1);
+	if (argc == 2) {
+		if ((f = fopen(argv[1], "rb")) == NULL) {
+			fprintf(stderr, "Error opening file: %s\n", argv[1]);
+			exit(-1);
+		}
+	} else {
+		f = stdin;
 	}
 
 	if (fscanf(f, "%d", &sqrt_size) != 1) {
