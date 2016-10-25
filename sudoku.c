@@ -15,6 +15,7 @@ static trylist_t **game_board;
 static pos_t *create_blank_list(int *num_blanks);
 static int propagate_restrictions(int x, int y);
 static int solve_game(const pos_t *blanks, int blanks_size);
+static void restore_game(const pos_t *blanks, int blanks_size);
 static void print_game(void);
 
 // Used to order blank spaces by number of possibilities (less possibilities first)
@@ -81,22 +82,20 @@ int main(int argc, char *argv[])
 	}
 
 	// Solve the puzzle
-	if (solve_game(blanks, blanks_count) < 0) {
+	int ret;
+	if ((ret = solve_game(blanks, blanks_count)) == 0) {
+		// Print the solved puzzle
+		print_game();
+	} else {
 		printf("No solution\n");
-		free(game_board);
-		free(game_data);
-		free(blanks);
-		exit(-1);
 	}
-
-	// Print the result
-	print_game();
 
 	// Free memory
 	free(game_board);
 	free(game_data);
 	free(blanks);
-	return 0;
+
+	return ret;
 }
 
 
@@ -205,9 +204,7 @@ static int solve_game(const pos_t *blanks, int blanks_size)
 		// Update the board with the new value
 		if (propagate_restrictions(x, y) < 0) {
 			// If the update failed, we have to restore the previous state
-			for (int i = 0; i < blanks_size; i++) {
-				game_board[blanks[i].x][blanks[i].y] = blanks[i].list;
-			}
+			restore_game(blanks, blanks_size);
 			continue;  // Next possibility
 		}
 
@@ -231,9 +228,7 @@ static int solve_game(const pos_t *blanks, int blanks_size)
 		if (solve_game(new_blanks, new_blanks_size) < 0) {
 			free(new_blanks);
 			// If the solve failed, we have to restore the previous state
-			for (int i = 0; i < blanks_size; i++) {
-				game_board[blanks[i].x][blanks[i].y] = blanks[i].list;
-			}
+			restore_game(blanks, blanks_size);
 			continue;  // Next Possibility
 		}
 
@@ -242,6 +237,17 @@ static int solve_game(const pos_t *blanks, int blanks_size)
 	}
 
 	return -1;
+}
+
+
+/*
+ * Restores the game board empty spaces from the blanks array
+ */
+inline static void restore_game(const pos_t *blanks, int blanks_size)
+{
+	for (int i = 0; i < blanks_size; i++) {
+		game_board[blanks[i].x][blanks[i].y] = blanks[i].list;
+	}
 }
 
 
