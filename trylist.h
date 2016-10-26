@@ -8,10 +8,12 @@
 
 #define MAX_GAME_SIZE  225  // Reducing this value decreases memory use
 
+#define BITS2BYTES(n) ((((n)-1)>>3)+1)  // Bytes used by n bits
+
 typedef struct {
 	unsigned char number;  // The number in the position (0 if none)
 	unsigned char count;   // The number of possibilities
-	unsigned char list[MAX_GAME_SIZE];
+	unsigned char list[BITS2BYTES(MAX_GAME_SIZE)];
 } trylist_t;
 
 
