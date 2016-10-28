@@ -5,6 +5,8 @@
 #define BMAP_TOGGLE(bmap,num)   ((bmap)[(num)>>3]^=(0x1<<((num)&0x07)))
 #define BMAP_ISSET(bmap,num)    (((bmap)[(num)>>3]&(0x1<<((num)&0x07)))!=0)
 
+#define USE_GCC_BUILTIN
+
 static int game_size;
 static int list_size;
 
@@ -56,6 +58,9 @@ int tl_remove(trylist_t *tl, int n)
 		for (int i = 0; i < list_size; i++) {
 			if (tl->list[i] != 0) {
 				// Find which bit is set
+#ifdef USE_GCC_BUILTIN
+				tl->number = (i << 3) + __builtin_ffs(tl->list[i]);
+#else
 				unsigned int res = (i << 3);
 				unsigned int temp = tl->list[i];
 				while ((temp & 1) == 0) {
@@ -63,6 +68,7 @@ int tl_remove(trylist_t *tl, int n)
 					temp >>= 1;
 				}
 				tl->number = res + 1;
+#endif
 				break;
 			}
 		}
@@ -82,12 +88,16 @@ int tl_find_next(const trylist_t *tl, int start)
 		unsigned int temp = tl->list[start_byte] >> start_bit;
 		if (temp != 0) {
 			// Find the first set bit
+#ifdef USE_GCC_BUILTIN
+			return (start_byte << 3) + start_bit + __builtin_ffs(temp);
+#else
 			unsigned int res = (start_byte << 3) + start_bit;
 			while ((temp & 1) == 0) {
 				res++;
 				temp >>= 1;
 			}
 			return res + 1;
+#endif
 		}
 		start_bit = 0;
 	}
