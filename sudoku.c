@@ -19,13 +19,10 @@ static void restore_game(const pos_t *blanks, int blanks_size);
 static void print_game(void);
 
 // Used to order blank spaces by number of possibilities (less possibilities first)
-static int empty_cmp(const void *a, const void *b)
-{
-	 pos_t *p1 = (pos_t*)a;
-	 pos_t *p2 = (pos_t*)b;
-
-	return p1->list.count - p2->list.count;
-}
+#define SORT_NAME pos
+#define SORT_TYPE pos_t
+#define SORT_CMP(x, y) ((x).list.count - (y).list.count)
+#include "sort.h"
 
 
 int main(int argc, char *argv[])
@@ -226,7 +223,7 @@ static int solve_game(const pos_t *blanks, int blanks_size)
 		}
 
 		// Sort the list by number of possibilities
-		qsort(new_blanks, new_blanks_size, sizeof(*new_blanks), empty_cmp);
+		pos_binary_insertion_sort(new_blanks, new_blanks_size);
 
 		// Solve the updated board
 		if (solve_game(new_blanks, new_blanks_size) < 0) {
@@ -298,7 +295,7 @@ static pos_t *create_blank_list(int *num_blanks)
 	}
 
 	// Sort the list by number of possibilities
-	qsort(blanks, blanks_count, sizeof(*blanks), empty_cmp);
+	pos_binary_insertion_sort(blanks, blanks_count);
 
 	*num_blanks = blanks_count;
 	return blanks;
