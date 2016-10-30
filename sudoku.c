@@ -14,6 +14,7 @@ static trylist_t **game_board;
 
 static pos_t *create_blank_list(int *num_blanks);
 static int propagate_restrictions(int x, int y);
+static int update_board(const pos_t *blanks, int blanks_size);
 static int solve_game(const pos_t *blanks, int blanks_size);
 static void restore_game(const pos_t *blanks, int blanks_size);
 static void print_game(void);
@@ -176,6 +177,110 @@ static int propagate_restrictions(int x, int y)
 }
 
 
+static int update_board(const pos_t *blanks, int blanks_size)
+{
+	// These store the count of each possibility on each line/column/block
+	// First dimension is the line/column/block, second dimension is the number of the possibility
+	unsigned char line_counts[game_size][game_size];
+	unsigned char column_counts[game_size][game_size];
+	unsigned char block_counts[game_size][game_size];
+	memset(line_counts, 0, sizeof(line_counts));
+	memset(column_counts, 0, sizeof(column_counts));
+	memset(block_counts, 0, sizeof(block_counts));
+
+	// Go through the previous blanks and count the number of each possibility for every position
+	// Ignore the first position because we've already filled it
+	for (int i = 1; i < blanks_size; i++) {
+		if (game_board[blanks[i].x][blanks[i].y].number == 0) {  // Still blank after update?
+			int x = blanks[i].x;
+			int y = blanks[i].y;
+			int b = (x / sqrt_size) * sqrt_size + (y / sqrt_size);
+			trylist_t *tl = &game_board[x][y];
+			int p;
+			int j = tl->count;
+			for (j--, p = tl_find_next(tl, 1); p != 0; j--, p = j < 0 ? 0 : tl_find_next(tl, p + 1)) {
+				if (line_counts[x][p - 1] == 0) {  // First found, store position
+					line_counts[x][p - 1] = y + 1;
+				} else {  // Found after first, invalidate entry
+					line_counts[x][p - 1] = 0xFF;
+				}
+
+				if (column_counts[y][p - 1] == 0) {  // First found, store position
+					column_counts[y][p - 1] = x + 1;
+				} else {  // Found after first, invalidate entry
+					column_counts[y][p - 1] = 0xFF;
+				}
+
+				block_counts[b][p - 1]++;
+			}
+		}
+	}
+
+	// Check for possibilities which are only present once in the line
+	for (int l = 0; l < game_size; l++) {
+		for (int p = 0; p < game_size; p++) {
+			if (line_counts[l][p] != 0 && line_counts[l][p] != 0xFF) {
+				int c = line_counts[l][p] - 1;
+				if (game_board[l][c].number == 0) {
+					if (tl_find_next(&game_board[l][c], p + 1) == p + 1) {
+						game_board[l][c].number = p + 1;
+						if (propagate_restrictions(l, c) == -1) {
+							return -1;
+						}
+					}
+				}
+			}
+		}
+	}
+
+	// Check for possibilities which are only present once in the column
+	for (int c = 0; c < game_size; c++) {
+		for (int p = 0; p < game_size; p++) {
+			if (column_counts[c][p] != 0 && column_counts[c][p] != 0xFF) {
+				int l = column_counts[c][p] - 1;
+				if (game_board[l][c].number == 0) {
+					if (tl_find_next(&game_board[l][c], p + 1) == p + 1) {
+						game_board[l][c].number = p + 1;
+						if (propagate_restrictions(l, c) == -1) {
+							return -1;
+						}
+					}
+				}
+			}
+		}
+	}
+
+	// Check for possibilities which are only present once in the block
+	for (int b = 0; b < game_size; b++) {
+		for (int p = 0; p < game_size; p++) {
+			if (block_counts[b][p] == 1) {
+				int bl_start_x = (b / sqrt_size) * sqrt_size;
+				int bl_start_y = (b % sqrt_size) * sqrt_size;
+
+				for (int l = bl_start_x; l < bl_start_x + sqrt_size; l++) {
+					for (int c = bl_start_y; c < bl_start_y + sqrt_size; c++) {
+						if (game_board[l][c].number == 0) {
+							if (tl_find_next(&game_board[l][c], p + 1) == p + 1) {
+								game_board[l][c].number = p + 1;
+								if (propagate_restrictions(l, c) == -1) {
+									return -1;
+								}
+								// Get out of the innermost loop only because the extra logic to get
+								// out of both loops is more expensive than needlessly running the
+								// second loop to completion
+								break;
+							}
+						}
+					}
+				}
+			}
+		}
+	}
+
+	return 0;
+}
+
+
 /*
  * Tries all possible combinations of possibilities to solve the puzzle
  * Returns -1 if the puzzle is unsolvable
@@ -203,7 +308,7 @@ static int solve_game(const pos_t *blanks, int blanks_size)
 		game_board[x][y].number = p;
 
 		// Update the board with the new value
-		if (propagate_restrictions(x, y) < 0) {
+		if (propagate_restrictions(x, y) < 0 || update_board(blanks, blanks_size) < 0) {
 			// If the update failed, we have to restore the previous state
 			restore_game(blanks, blanks_size);
 			continue;  // Next possibility
